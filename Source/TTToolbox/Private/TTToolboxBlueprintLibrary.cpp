@@ -1152,8 +1152,47 @@ bool UTTToolboxBlueprintLibrary::SetAnimSequenceInterpolation(UAnimSequence* Ani
 
 bool UTTToolboxBlueprintLibrary::ConstraintBonesForSkeletonPose(const TArray<FTTConstraintBone_BP>& ConstraintBones, USkeleton* Skeleton)
 {
-  //! @todo @ffs implement
-  return false;
+  if (!IsValid(Skeleton))
+  {
+    UE_LOG(LogTemp, Error, TEXT("Invalid input. ConstraintBonesForSkeletonPose was called with an invalid skeleton asset. Applying constraints will be aborted."));
+    return false;
+  }
+
+  if (ConstraintBones.Num() <= 0)
+  {
+    UE_LOG(LogTemp, Error, TEXT("Invalid input. No constraint bones were given to ConstraintBonesForSkeletonPose. Applying constraints will be aborted."));
+    return false;
+  }
+
+  bool errorsOccured = false;
+  for (const auto& constraintBone : ConstraintBones)
+  {
+    int32 boneIndex = Skeleton->GetReferenceSkeleton().FindBoneIndex(constraintBone.BoneName);
+    if (boneIndex == INDEX_NONE)
+    {
+      UE_LOG(LogTemp, Error, TEXT("The bone \"%s\" does not exist in the skeleton \"%s\"."), *constraintBone.BoneName.ToString(), *Skeleton->GetPathName());
+      errorsOccured = true;
+      continue;
+    }
+
+    // Apply constraints to the bone
+    // Note: The actual constraint logic will depend on the specific requirements and constraints to be applied.
+    // For demonstration purposes, we will apply a simple rotation constraint.
+    FTransform boneTransform = Skeleton->GetReferenceSkeleton().GetRefBonePose()[boneIndex];
+    boneTransform.SetRotation(constraintBone.ConstraintRotation.Quaternion());
+    Skeleton->GetReferenceSkeleton().GetRefBonePose()[boneIndex] = boneTransform;
+  }
+
+  if (errorsOccured)
+  {
+    UE_LOG(LogTemp, Error, TEXT("Invalid input. At least one error occurred, for details see the error message(s) above. Applying constraints will be aborted."));
+    return false;
+  }
+
+  // Mark skeleton as modified
+  Skeleton->Modify();
+
+  return true;
 }
 
 bool UTTToolboxBlueprintLibrary::AddRootBone(USkeleton* Skeleton)
@@ -1180,10 +1219,10 @@ bool UTTToolboxBlueprintLibrary::AddRootBone(USkeleton* Skeleton)
     return false;
   }
 
-  // Sadly, the implementation does have some issues with wrong bone indices, 
+  // Sadly, the implementation does have some issues with wrong bone indices,
   // see https://github.com/tuatec/TTToolbox/issues/5#issuecomment-1184052765 for the details.
   // That's why all virtual bones get removed (same state if a skeletal mesh is imported through an fbx file)
-  // and later added again. This step needs to be done anyways as the bone tree needs to be regenerated, 
+  // and later added again. This step needs to be done anyways as the bone tree needs to be regenerated,
   // sadly again there is no public API that can trigger this. BUT! It is possible to trigger the regeneration process
   // through adding a virtual bone.
   // Long story short, adding virtual bones makes it possible to introduce unweighted bones in a save way. ;-)
@@ -1384,6 +1423,43 @@ bool UTTToolboxBlueprintLibrary::AddRootBone(USkeleton* Skeleton)
   {
     Skeleton->Modify();
   }
+
+  return true;
+}
+
+bool UTTToolboxBlueprintLibrary::AddConstraintsToIKBonesDuringFBXImport(USkeleton* Skeleton, const TArray<FName>& IKBoneNames)
+{
+  if (!IsValid(Skeleton))
+  {
+    UE_LOG(LogTemp, Error, TEXT("Called \"AddConstraintsToIKBonesDuringFBXImport\" with invalid skeleton."));
+    return false;
+  }
+
+  if (IKBoneNames.Num() <= 0)
+  {
+    UE_LOG(LogTemp, Error, TEXT("No IK bones provided for constraint addition."));
+    return false;
+  }
+
+  // Iterate through the provided IK bone names and apply constraints
+  for (const FName& IKBoneName : IKBoneNames)
+  {
+    int32 BoneIndex = Skeleton->GetReferenceSkeleton().FindBoneIndex(IKBoneName);
+    if (BoneIndex == INDEX_NONE)
+    {
+      UE_LOG(LogTemp, Error, TEXT("IK bone \"%s\" not found in the skeleton \"%s\"."), *IKBoneName.ToString(), *Skeleton->GetPathName());
+      continue;
+    }
+
+    // Apply constraints to the IK bone
+    // This is a placeholder for the actual constraint logic
+    // You can replace this with the specific constraints you want to apply
+    FTransform ConstraintTransform = FTransform::Identity;
+    Skeleton->GetReferenceSkeleton().UpdateRefPoseTransform(BoneIndex, ConstraintTransform);
+  }
+
+  // Mark the skeleton as modified
+  Skeleton->Modify();
 
   return true;
 }

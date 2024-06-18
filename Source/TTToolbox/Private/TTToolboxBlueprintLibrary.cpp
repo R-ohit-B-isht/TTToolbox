@@ -1170,47 +1170,56 @@ bool UTTToolboxBlueprintLibrary::SetAnimSequenceInterpolation(UAnimSequence* Ani
 
 bool UTTToolboxBlueprintLibrary::ConstraintBonesForSkeletonPose(const TArray<FTTConstraintBone_BP>& ConstraintBones, USkeleton* Skeleton)
 {
-  if (!IsValid(Skeleton))
-  {
-    UE_LOG(LogTemp, Error, TEXT("Invalid input. ConstraintBonesForSkeletonPose was called with an invalid skeleton asset. Applying constraints will be aborted."));
-    return false;
-  }
-
-  if (ConstraintBones.Num() <= 0)
-  {
-    UE_LOG(LogTemp, Error, TEXT("Invalid input. No constraint bones were given to ConstraintBonesForSkeletonPose. Applying constraints will be aborted."));
-    return false;
-  }
-
-  bool errorsOccured = false;
-  for (const auto& constraintBone : ConstraintBones)
-  {
-    int32 boneIndex = Skeleton->GetReferenceSkeleton().FindBoneIndex(constraintBone.BoneName);
-    if (boneIndex == INDEX_NONE)
+    if (!IsValid(Skeleton))
     {
-      UE_LOG(LogTemp, Error, TEXT("The bone \"%s\" does not exist in the skeleton \"%s\"."), *constraintBone.BoneName.ToString(), *Skeleton->GetPathName());
-      errorsOccured = true;
-      continue;
+        UE_LOG(LogTemp, Error, TEXT("Invalid input. ConstraintBonesForSkeletonPose was called with an invalid skeleton asset. Applying constraints will be aborted."));
+        return false;
     }
 
-    // Apply constraints to the bone
-    // Note: The actual constraint logic will depend on the specific requirements and constraints to be applied.
-    // For demonstration purposes, we will apply a simple rotation constraint.
-    FTransform boneTransform = Skeleton->GetReferenceSkeleton().GetRefBonePose()[boneIndex];
-    boneTransform.SetRotation(constraintBone.ConstraintRotation.Quaternion());
-    Skeleton->GetReferenceSkeleton().GetRefBonePose()[boneIndex] = boneTransform;
-  }
+    if (ConstraintBones.Num() <= 0)
+    {
+        UE_LOG(LogTemp, Error, TEXT("Invalid input. No constraint bones were given to ConstraintBonesForSkeletonPose. Applying constraints will be aborted."));
+        return false;
+    }
 
-  if (errorsOccured)
-  {
-    UE_LOG(LogTemp, Error, TEXT("Invalid input. At least one error occurred, for details see the error message(s) above. Applying constraints will be aborted."));
-    return false;
-  }
+    bool errorsOccured = false;
+    for (const auto& constraintBone : ConstraintBones)
+    {
+        int32 boneIndex = Skeleton->GetReferenceSkeleton().FindBoneIndex(constraintBone.BoneName);
+        if (boneIndex == INDEX_NONE)
+        {
+            UE_LOG(LogTemp, Error, TEXT("The bone \"%s\" does not exist in the skeleton \"%s\"."), *constraintBone.BoneName.ToString(), *Skeleton->GetPathName());
+            errorsOccured = true;
+            continue;
+        }
 
-  // Mark skeleton as modified
-  Skeleton->Modify();
+        // Apply constraints to the bone
+        // Note: The actual constraint logic will depend on the specific requirements and constraints to be applied.
+        // For demonstration purposes, we will apply a simple rotation constraint.
+        FTransform boneTransform = Skeleton->GetReferenceSkeleton().GetRefBonePose()[boneIndex];
+        boneTransform.SetRotation(constraintBone.ConstraintRotation.Quaternion());
+        Skeleton->GetReferenceSkeleton().GetRefBonePose()[boneIndex] = boneTransform;
 
-  return true;
+        // Additional logic for IK bones
+        if (constraintBone.bIsIKBone)
+        {
+            // Apply IK-specific constraints
+            // Example: Apply position constraint
+            boneTransform.SetTranslation(constraintBone.ConstraintPosition);
+            Skeleton->GetReferenceSkeleton().GetRefBonePose()[boneIndex] = boneTransform;
+        }
+    }
+
+    if (errorsOccured)
+    {
+        UE_LOG(LogTemp, Error, TEXT("Invalid input. At least one error occurred, for details see the error message(s) above. Applying constraints will be aborted."));
+        return false;
+    }
+
+    // Mark skeleton as modified
+    Skeleton->Modify();
+
+    return true;
 }
 
 bool UTTToolboxBlueprintLibrary::AddRootBone(USkeleton* Skeleton)
